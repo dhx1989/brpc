@@ -23,10 +23,6 @@ echo "build combination: PURPOSE=$PURPOSE CXX=$CXX CC=$CC"
 
 if [ "$PURPOSE" = "compile-with-bazel" ]; then
     runcmd "bazel build -j 12 -c opt --copt -DHAVE_ZLIB=1 //..."
-    runcmd "bazel test -j 12 -c opt --copt -DHAVE_ZLIB=1 --define=unittest=true //..."
-    # Build with glog
-    runcmd "bazel build -j 12 -c opt --copt -DHAVE_ZLIB=1 --define=with_glog=true //..."
-    runcmd "bazel test -j 12 -c opt --copt -DHAVE_ZLIB=1 --define=with_glog=true  --define=unittest=true //..."
     exit 0
 fi
 
@@ -38,7 +34,26 @@ fi
 if [ "$PURPOSE" = "compile" ]; then
     make -j4 && sh tools/make_all_examples
 elif [ "$PURPOSE" = "unittest" ]; then
-    cd test && sh ./run_tests.sh
+    # pass the unittest from default Makefile to accelerate build process
+    :
+else
+    echo "Unknown purpose=\"$PURPOSE\""
+fi
+
+echo "start building by cmake"
+rm -rf build && mkdir build && cd build
+if [ "$PURPOSE" = "compile" ]; then
+    if ! cmake ..; then
+        echo "Fail to generate Makefile by cmake"
+        exit 1
+    fi
+    make -j4
+elif [ "$PURPOSE" = "unittest" ]; then
+    if ! cmake -DBUILD_UNIT_TESTS=ON ..; then
+        echo "Fail to generate Makefile by cmake"
+        exit 1
+    fi
+    make -j4 && cd test && sh ./run_tests.sh && cd ../
 else
     echo "Unknown purpose=\"$PURPOSE\""
 fi
